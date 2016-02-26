@@ -5,28 +5,23 @@
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-WebSocketsServer webSocket = WebSocketsServer(81);
+
 const char *ssid = "SHARLS";
 const char *password = "26316445";
 const int bluePin = 16;
 
+// WEBSOCKETS START
+WebSocketsServer webSocket = WebSocketsServer(81);
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
-
     switch(type) {
         case WStype_DISCONNECTED:
-
+        break;
+        case WStype_CONNECTED: {
+        IPAddress ip = webSocket.remoteIP(num);
+        }
             break;
-        case WStype_CONNECTED:
-         {
-                IPAddress ip = webSocket.remoteIP(num);
-
-
-            }
-            break;
-        case WStype_TEXT:
-        {
-
-            String text = String((char *) &payload[0]);
+        case WStype_TEXT: {
+        String text = String((char *) &payload[0]);
           if(text=="LED"){
 
             digitalWrite(16,HIGH);
@@ -35,25 +30,20 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
             Serial.println("led just lit");
             webSocket.sendTXT(num, "led just lit", lenght);
             }
-
-
                    }
-
-
-           webSocket.sendTXT(num, payload, lenght);
+            webSocket.sendTXT(num, payload, lenght);
             webSocket.broadcastTXT(payload, lenght);
             break;
 
-        case WStype_BIN:
-
+            case WStype_BIN:
             hexdump(payload, lenght);
-
             // echo data back to browser
             webSocket.sendBIN(num, payload, lenght);
             break;
     }
 
-}
+  }
+  // WEBSOCKETS END
 
 
 void setup() {
@@ -62,13 +52,15 @@ void setup() {
     pinMode(16,OUTPUT);
 
     WiFi.begin(ssid, password);
-
     while(WiFi.status() != WL_CONNECTED) {
         delay(100);
-    }
-
+        }
     Serial.println(WiFi.localIP());
 
+    // WEBSOCKETS  SETUP
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+    // WEBSOCKETS  SETUP ENDS
 
     // OTA STARTS
         // Port defaults to 8266
@@ -99,11 +91,8 @@ void setup() {
   });
   ArduinoOTA.begin();
     // OTA ENDS
-
-    webSocket.begin();
-    webSocket.onEvent(webSocketEvent);
-
 }
+
 
 void loop() {
     ArduinoOTA.handle();
