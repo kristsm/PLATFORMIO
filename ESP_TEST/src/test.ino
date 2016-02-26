@@ -1,54 +1,112 @@
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
+#include <WiFiClient.h> 
+#include <WebSocketsServer.h>
+#include <Hash.h>
+WebSocketsServer webSocket = WebSocketsServer(81);
+const char *ssid = "ESP";
+const char *password = "12345678";
+const int bluePin = 16;
+const int redPin = 15;
+const int greenPin = 12;
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght) {
 
-const char* ssid = "ESP";
-const char* password = "12345678";
+    switch(type) {
+        case WStype_DISCONNECTED:
+            
+            break;
+        case WStype_CONNECTED:
+         {
+                IPAddress ip = webSocket.remoteIP(num);
+                
+                
+            }
+            break;
+        case WStype_TEXT:
+        {
+            
+            String text = String((char *) &payload[0]);
+          if(text=="LED"){
+           
+            digitalWrite(16,HIGH);
+            delay(500);
+            digitalWrite(16,LOW);
+            Serial.println("led just lit");
+            webSocket.sendTXT(num, "led just lit", lenght);
+            }
+            
+           if(text.startsWith("x")){
+            
+            String xVal=(text.substring(text.indexOf("x")+1,text.length())); 
+            int xInt = xVal.toInt();
+            analogWrite(redPin,xInt); 
+            Serial.println(xVal);
+            webSocket.sendTXT(num, "red changed", lenght);
+           }
+
+
+           if(text.startsWith("y")){
+            
+            String yVal=(text.substring(text.indexOf("y")+1,text.length())); 
+            int yInt = yVal.toInt();
+            analogWrite(greenPin,yInt); 
+            Serial.println(yVal);
+            webSocket.sendTXT(num, "green changed", lenght);
+           }
+
+           if(text.startsWith("z")){
+            
+            String zVal=(text.substring(text.indexOf("z")+1,text.length())); 
+            int zInt = zVal.toInt();
+            analogWrite(bluePin,zInt); 
+            Serial.println(zVal);
+            webSocket.sendTXT(num, "blue changed", lenght);
+           }
+           if(text=="RESET"){
+           
+           analogWrite(bluePin,LOW);
+           analogWrite(redPin,LOW);
+            analogWrite(greenPin,LOW);
+            Serial.println("reset");
+            
+            }
+            
+
+                            
+                   }
+            
+           
+           webSocket.sendTXT(num, payload, lenght);
+            webSocket.broadcastTXT(payload, lenght);
+            break;
+        
+        case WStype_BIN:
+     
+            hexdump(payload, lenght);
+
+            // echo data back to browser
+            webSocket.sendBIN(num, payload, lenght);
+            break;
+    }
+
+}
+
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("Booting");
-  WiFi.softAP(ssid, password);
-  IPAddress myIP = WiFi.softAPIP();
+   
+    Serial.begin(115200);
+    pinMode(16,OUTPUT);
+    pinMode(15,OUTPUT);
+    pinMode(12,OUTPUT);
+   WiFi.softAP(ssid, password);
 
-  // Port defaults to 8266
-  // ArduinoOTA.setPort(8266);
-
-  // Hostname defaults to esp8266-[ChipID]
-  // ArduinoOTA.setHostname("myesp8266");
-
-  // No authentication by default
-  // ArduinoOTA.setPassword((const char *)"123");
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
-  Serial.println("Ready");
-  Serial.print("IP address: ");
+ IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
   Serial.println(myIP);
-  pinMode(16, OUTPUT);
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
 }
 
 void loop() {
-  ArduinoOTA.handle();
-  digitalWrite(16, HIGH);
-  delay (50);
-  digitalWrite(16, LOW);
-  delay (50);
+    webSocket.loop();
 }
